@@ -5,6 +5,7 @@ import Statistics.Sample
 import Statistics.Function
 import qualified Data.Vector as V
 import System.Environment
+import Data.Maybe
 
 import Lib
 
@@ -16,7 +17,7 @@ main = do
   let threshold = if length args < 2 then 1.0 else read $ head $ tail args
   d <- parseCSVFromFile dataFileName'
   let ds = head $ rights $ d:[]
-      difflist = getDiffList $ filterList (overThreshold threshold) $ getDoubleRecord ds
+      difflist = toDiffList $ catMaybes $ toXWithThresholdMaybe threshold $ (mapPoints read $ toPoints ds :: [Point Double])
       vec = V.fromList difflist
   putStrLn ("This is " ++ progname ++ "\n"
                 ++ "File: " ++ dataFileName' ++ "\n"
