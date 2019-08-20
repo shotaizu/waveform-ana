@@ -13,6 +13,8 @@ filterList p [] = []
 filterList p (x:xs) = if p (x:xs) then x:(filterList p xs) else filterList p xs
 
 data Point a = Point a a deriving (Show, Eq, Ord)
+instance Functor Point where
+  fmap f (Point x y) = Point (f x) (f y)
 
 fstPoint (Point x y) = x
 scdPoint (Point x y) = y
@@ -24,7 +26,7 @@ listToPoint [] = Nothing
 toPoints :: [[a]] -> [Point a]
 toPoints xs = mapMaybe listToPoint xs
 mapPoints :: (a -> b) -> [Point a] -> [Point b]
-mapPoints p ((Point x y):xs) = (Point (p x) (p y)):(mapPoints p xs)
+mapPoints p (x:xs) = (fmap p x):(mapPoints p xs)
 mapPoints p [] = []
 calcXThreshold :: (Fractional a, Ord a) => a -> Point a -> Point a -> Maybe a
 calcXThreshold th (Point x0 y0) (Point x1 y1)
