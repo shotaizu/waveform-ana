@@ -24,6 +24,7 @@ dependencies:
 - csv
 - statistics
 - vector
+- directory >= 1.3
 
 library:
   source-dirs: src
