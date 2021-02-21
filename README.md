@@ -2,5 +2,5 @@
 
 ## Usage
 ```
-$ waveform-ana-exe [inputfile].csv [threshold]
+$ waveform-ana-exe {threshold in voltage} {ch1.wfm} {ch2.wfm}
 ```
