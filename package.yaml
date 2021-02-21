@@ -1,7 +1,7 @@
 name:                waveform-ana
-version:             0.1.0.0
+version:             1.0.0.0
 github:              "shotaizu/waveform-ana"
-license:             BSD3
+license:             GPLv3
 author:              "Shota Izumiyama"
 maintainer:          "izumiyama@hep.phys.titech.ac.jp"
 copyright:           ""
@@ -25,6 +25,9 @@ dependencies:
 - statistics
 - vector
 - directory >= 1.3
+- bytestring-conversion >= 0.3
+- binary >= 0.8
+- bytestring >= 0.10
 
 library:
   source-dirs: src
