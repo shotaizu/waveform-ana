@@ -15,17 +15,18 @@ main :: IO ()
 main = do
   args <- getArgs
   progname  <- getProgName
-  if length args < 3
+  if length args < 4
     then
       putStrLn  (  progname ++ "\n"
                 ++ "Usage: \n"
-                ++ "\t$ " ++ progname ++ " {threshold} {data1} {data2}\n"
+                ++ "\t$ " ++ progname ++ " {threshold1} {data1} {threshold2} {data2}\n"
                 )
     else do
       let
         dataFileName1 = args !! 1
-        dataFileName2 = args !! 2
-        threshold = head args
+        dataFileName2 = args !! 3
+        threshold1 = head args
+        threshold2 = args !! 2
       flagDoesFile1 <- doesFileExist dataFileName1
       flagDoesFile2 <- doesFileExist dataFileName2
       dataFileNames <- case flagDoesFile1 && flagDoesFile2 of
@@ -35,8 +36,8 @@ main = do
       f1 <- readTektronixFile (head dataFileNames)
       f2 <- readTektronixFile (dataFileNames !! 1)
       let
-        xpoints1 = flatInTime $ findCrossPoints (read threshold) ((takeTimeVoltageCurve . parseTektronixFormat) f1)
-        xpoints2 = flatInTime $ findCrossPoints (read threshold) ((takeTimeVoltageCurve . parseTektronixFormat) f2)
+        xpoints1 = flatInTime $ findCrossPoints (read threshold1) ((takeTimeVoltageCurve . parseTektronixFormat) f1)
+        xpoints2 = flatInTime $ findCrossPoints (read threshold2) ((takeTimeVoltageCurve . parseTektronixFormat) f2)
       --print xpoints1
       --print xpoints2
       print $ compCenterEdge xpoints1 xpoints2
