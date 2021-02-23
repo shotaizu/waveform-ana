@@ -2,5 +2,5 @@
 
 ## Usage
 ```
-$ waveform-ana-exe {threshold in voltage} {ch1.wfm} {ch2.wfm}
+$ waveform-ana-exe {threshold1 in voltage} {ch1.wfm} {threshold1 in voltage} {ch2.wfm}
 ```
