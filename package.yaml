@@ -1,7 +1,7 @@
 name:                waveform-ana
 version:             1.0.0.0
 github:              "shotaizu/waveform-ana"
-license:             GPLv3
+license:             GPL-3
 author:              "Shota Izumiyama"
 maintainer:          "izumiyama@hep.phys.titech.ac.jp"
 copyright:           ""
