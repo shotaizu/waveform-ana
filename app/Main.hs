@@ -1,4 +1,5 @@
 module Main where
+import Control.Monad
 import Data.Maybe
 import Statistics.Function
 import Statistics.Sample
@@ -63,8 +64,8 @@ main = do
           dataFileName2 = nonoptArg !! 3
           threshold1 = head nonoptArg
           threshold2 = nonoptArg !! 2
-        print $ "threshold1: " ++ show threshold1 ++ ", file1: " ++ dataFileName1
-                ++ ", threshold2: " ++ show threshold2 ++ ", file2: " ++ dataFileName2
+        when verbose $ hPutStrLn stderr $ "threshold1: " ++ show threshold1 ++ ", file1: " ++ dataFileName1 ++ ", threshold2: " ++ show threshold2 ++ ", file2: " ++ dataFileName2
+
         flagDoesFile1 <- doesFileExist dataFileName1
         flagDoesFile2 <- doesFileExist dataFileName2
         dataFileNames <- if flagDoesFile1 && flagDoesFile2
@@ -86,7 +87,7 @@ main = do
         let
           dataFileName = nonoptArg !! 1
           threshold = head nonoptArg
-        hPutStrLn stderr $ "threshold: " ++ show threshold ++ ", file: " ++ dataFileName
+        when verbose $ hPutStrLn stderr $ "threshold: " ++ show threshold ++ ", file: " ++ dataFileName
         flagDoesFile <- doesFileExist dataFileName
         if not flagDoesFile then
           exitFailure
