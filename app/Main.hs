@@ -12,16 +12,20 @@ import TektronixFormat
 
 data PrgMode = Trigger | Period | TIE
   deriving (Show, Eq)
+data TIEMode = TIELocal | TIEGlobal
+  deriving (Show, Eq)
 data Options = Options { optVerbose :: Bool
                        , optMode :: PrgMode
                        , optStartEpochTime :: Int
                        , optIdealPeriod :: Double
-                       }
+                       , optTIEGL :: TIEMode
+                       } deriving (Show)
 
 startOptions = Options { optVerbose = False
                        , optMode  = Period
                        , optStartEpochTime = 1614135600 -- 2021-02-24 12:00:00
                        , optIdealPeriod = 8e-9
+                       , optTIEGL = TIELocal
                        }
 
 basicUsage prgname = 
@@ -40,12 +44,13 @@ options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True
           , Option "" ["tie"] (NoArg (\opt -> return opt {optMode = TIE})) "Analysis mode: TIE -> calculate difference from ideal clcok edge"
           , Option "" ["tstart"]
             (ReqArg 
-              (\arg opt -> return opt { optStartEpochTime = read arg}) "TIME")
-            "For TIE analysis: base time in epoch format"
-          , Option "" ["period"]
+              (\arg opt -> return opt { optStartEpochTime = read arg, optTIEGL = TIEGlobal }) "TIME")
+            "For TIE analysis: base time in epoch format as global"
+          , Option "" ["idealperiod"]
             (ReqArg 
               (\arg opt -> return opt { optIdealPeriod = read arg}) "TIME")
             "For TIE analysis: ideal period in sec"
+          , Option "" ["localtie"] (NoArg (\opt -> return opt {optTIEGL = TIELocal})) "TIE ideal edge origin : set Local"
           , Option "h" ["help"]
             (NoArg
               (\_ -> do
@@ -65,9 +70,11 @@ main = do
   let Options { optVerbose = verbose
               , optMode = mode
               , optStartEpochTime = tstart
-              , optIdealPeriod = idealPeirod
+              , optIdealPeriod = idealPeriod
+              , optTIEGL = tieMode
               } = opts
       files = parseFileArgs nonoptArg :: [(Double, String)]
+  when verbose $ hPrint stderr opts
   case mode of 
     Trigger -> do
       if length files < 2
@@ -124,9 +131,9 @@ main = do
             f <- readTektronixFile dataFileName
             let
               sec = (gmtSec . header) f - tstart
-              diffEpochTime = fromIntegral sec  + (fracSec . header) f
-              idealEdge = generateTrueCLKEdge' (diffEpochTime + (impDimOffset . impDim1 . header) f) 0 idealPeirod
-              delta = ((head . takeDiff . take 2 ) idealEdge - idealPeirod) / idealPeirod
+              diffEpochTime = if tieMode == TIEGlobal then fromIntegral sec  + (fracSec . header) f else 0
+              idealEdge = generateTrueCLKEdge' (diffEpochTime + (impDimOffset . impDim1 . header) f) 0 idealPeriod
+              delta = ((head . takeDiff . take 2 ) idealEdge - idealPeriod) / idealPeriod
               epsilon = 1e-3
             when verbose $ hPutStrLn stderr $ "header GMT time = " ++ (show . gmtSec . header) f
             when (epsilon < delta) $ hPutStrLn stderr $ "Warning: neumerical digits-loss in grobal clock edge calculation: " ++ show delta
