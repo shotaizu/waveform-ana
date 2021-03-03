@@ -236,8 +236,8 @@ parseTektronixFormat f = TektronixFormat { staticFileInfo = (parseStaticFileInfo
 
 newtype CheckSum       = CheckSum B.ByteString deriving (Show)
 
-readTektronixFile :: String -> IO TektronixFormatB
-readTektronixFile path = do
+readTektronixFile' :: String -> IO TektronixFormatB
+readTektronixFile' path = do
   content <- B.readFile path
   (fi, left) <- (return . splitPart takeStatFileInfo dropStatFileInfo) content
   (head, leftHead) <- (return . splitPart takeHead dropHead) left
@@ -249,6 +249,10 @@ readTektronixFile path = do
                            , curveBufferB = curveBuf
                            , checkSumB = CheckSumB checksumByteString
                            }
+
+readTektronixFile :: String -> IO TektronixFormat
+readTektronixFile path = do
+  parseTektronixFormat <$> readTektronixFile' path
 
 
 nFieldStatinfo = 78

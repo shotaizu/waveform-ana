@@ -1,25 +1,27 @@
 module Main where
 import Control.Monad
 import Data.Maybe
-import Statistics.Function
-import Statistics.Sample
+import GHC.Natural
 import System.Console.GetOpt
 import System.Directory
 import System.Environment
 import System.Exit
 import System.IO
 
-import Lib
 import TektronixFormat
 
-data PrgMode = Trigger | Period 
+data PrgMode = Trigger | Period | TIE
   deriving (Show, Eq)
 data Options = Options { optVerbose :: Bool
                        , optMode :: PrgMode
+                       , optStartEpochTime :: Int
+                       , optIdealPeriod :: Double
                        }
 
 startOptions = Options { optVerbose = False
                        , optMode  = Period
+                       , optStartEpochTime = 1614135600 -- 2021-02-24 12:00:00
+                       , optIdealPeriod = 8e-9
                        }
 
 basicUsage prgname = 
@@ -28,11 +30,22 @@ basicUsage prgname =
   ++ "\t$ " ++ prgname ++ " -t {threshold1} {data1} {threshold2} {data2}\n"
   ++ "Usage for period-mode: \n"
   ++ "\t$ " ++ prgname ++ " -p {threshold} {data}\n"
+  ++ "Usage for tie-mode: \n"
+  ++ "\t$ " ++ prgname ++ " --tie {threshold} {data}" -- [threshold2] [data2]\n"
 
 options :: [ OptDescr (Options -> IO Options) ]
 options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True})) "Enable verbose message"
           , Option "t" ["trigger"] (NoArg (\opt -> return opt {optMode = Trigger})) "Analysis mode: Trigger -> relation of 2 channels"
           , Option "p" ["period"] (NoArg (\opt -> return opt {optMode = Period})) "Analysis mode: Period -> just measure 1 channel and calculate its period"
+          , Option "" ["tie"] (NoArg (\opt -> return opt {optMode = TIE})) "Analysis mode: TIE -> calculate difference from ideal clcok edge"
+          , Option "" ["tstart"]
+            (ReqArg 
+              (\arg opt -> return opt { optStartEpochTime = read arg}) "TIME")
+            "For TIE analysis: base time in epoch format"
+          , Option "" ["period"]
+            (ReqArg 
+              (\arg opt -> return opt { optIdealPeriod = read arg}) "TIME")
+            "For TIE analysis: ideal period in sec"
           , Option "h" ["help"]
             (NoArg
               (\_ -> do
@@ -51,19 +64,20 @@ main = do
   progname  <- getProgName
   let Options { optVerbose = verbose
               , optMode = mode
+              , optStartEpochTime = tstart
+              , optIdealPeriod = idealPeirod
               } = opts
+      files = parseFileArgs nonoptArg :: [(Double, String)]
   case mode of 
     Trigger -> do
-      if length nonoptArg < 4
+      if length files < 2
       then do
         hPutStrLn stderr (usageInfo (basicUsage progname) options)
         exitFailure
       else do
         let
-          dataFileName1 = nonoptArg !! 1
-          dataFileName2 = nonoptArg !! 3
-          threshold1 = head nonoptArg
-          threshold2 = nonoptArg !! 2
+          ( threshold1, dataFileName1 ) = head files
+          ( threshold2, dataFileName2 ) = head files
         when verbose $ hPutStrLn stderr $ "threshold1: " ++ show threshold1 ++ ", file1: " ++ dataFileName1 ++ ", threshold2: " ++ show threshold2 ++ ", file2: " ++ dataFileName2
 
         flagDoesFile1 <- doesFileExist dataFileName1
@@ -74,8 +88,8 @@ main = do
         f1 <- readTektronixFile (head dataFileNames)
         f2 <- readTektronixFile (dataFileNames !! 1)
         let
-          xpoints1 = flatInTime $ findCrossPoints (read threshold1) ((takeTimeVoltageCurve . parseTektronixFormat) f1)
-          xpoints2 = flatInTime $ findCrossPoints (read threshold2) ((takeTimeVoltageCurve . parseTektronixFormat) f2)
+          xpoints1 = flatInTime $ findCrossPoints threshold1 (takeTimeVoltageCurve f1)
+          xpoints2 = flatInTime $ findCrossPoints threshold2 (takeTimeVoltageCurve f2)
         print $ compCenterEdge xpoints1 xpoints2
         exitSuccess
     Period -> do
@@ -85,20 +99,54 @@ main = do
         exitFailure
       else do
         let
-          dataFileName = nonoptArg !! 1
-          threshold = head nonoptArg
+          ( threshold, dataFileName ) = head files
         when verbose $ hPutStrLn stderr $ "threshold: " ++ show threshold ++ ", file: " ++ dataFileName
         flagDoesFile <- doesFileExist dataFileName
         if not flagDoesFile then
           exitFailure
         else do
             f <- readTektronixFile dataFileName
-            mapM_ print $ takeDiff . flatInTime $ findCrossPoints (read threshold) ((takeTimeVoltageCurve . parseTektronixFormat) f)
+            mapM_ print $ takeDiff . flatInTime $ findCrossPoints threshold (takeTimeVoltageCurve f)
             exitSuccess
+    TIE -> do
+      if length nonoptArg < 2
+      then do
+        hPutStrLn stderr (usageInfo (basicUsage progname) options)
+        exitFailure
+      else do
+        let
+          ( threshold, dataFileName ) = head files
+        when verbose $ hPutStrLn stderr $ "threshold: " ++ show threshold ++ ", file: " ++ dataFileName
+        flagDoesFile <- doesFileExist dataFileName
+        if not flagDoesFile then
+          exitFailure
+        else do
+            f <- readTektronixFile dataFileName
+            let
+              sec = (gmtSec . header) f - tstart
+              diffEpochTime = fromIntegral sec  + (fracSec . header) f
+              idealEdge = generateTrueCLKEdge' (diffEpochTime + (impDimOffset . impDim1 . header) f) 0 idealPeirod
+              delta = ((head . takeDiff . take 2 ) idealEdge - idealPeirod) / idealPeirod
+              epsilon = 1e-3
+            when verbose $ hPutStrLn stderr $ "header GMT time = " ++ (show . gmtSec . header) f
+            when (epsilon < delta) $ hPutStrLn stderr $ "Warning: neumerical digits-loss in grobal clock edge calculation: " ++ show delta
+            mapM_ printDP $ zipWith (\x y -> (x, x-y)) (map (+ diffEpochTime) $ flatInTime $ findCrossPoints threshold (takeTimeVoltageCurve f)) idealEdge
+              where printDP (x,y) = putStrLn $ show x ++ " " ++ show y
 
   
 takeDiff :: (Num a) => [a] -> [a]
 takeDiff (x:y:xs) = y-x : takeDiff (y:xs)
 takeDiff [x] = []
 takeDiff [] = []
+
+generateTrueCLKEdge :: (Num a) => a -> a -> [a]
+generateTrueCLKEdge tstart period = [ tstart + period * fromIntegral i | i <- [0..]]
+generateTrueCLKEdge' :: (RealFrac a) => a -> a -> a -> [a]
+generateTrueCLKEdge' thr tstart period = [ tstart + period * fromIntegral i | i <- [s..]]
+  where s = floor $ (thr - tstart) / period
+
+parseFileArgs (x:y:xs) = (read x, y) : parseFileArgs xs
+parseFileArgs [x] = []
+parseFileArgs [] = []
+
 
