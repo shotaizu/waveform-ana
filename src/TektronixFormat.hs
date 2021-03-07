@@ -4,6 +4,7 @@ module TektronixFormat
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Conversion
 import qualified Data.Binary.Get as BinG
+import Data.List
 import GHC.Natural
 import GHC.Word
 
@@ -94,6 +95,7 @@ instance Functor CurveBuffer where
 instance Applicative CurveBuffer where
   pure f = CurveBuffer [f]
   (CurveBuffer fs) <*> (CurveBuffer xs) = CurveBuffer (fs <*> xs)
+newtype CheckSum       = CheckSum B.ByteString deriving (Show)
 
 parseStaticFileInfo :: StaticFileInfoB -> StaticFileInfo
 parseStaticFileInfo (StaticFileInfoB s) = StaticFileInfo {  byteOrderVerification = fromIntegral $ BinG.runGet BinG.getWord16le (cropByteString 0 2 s)
@@ -234,7 +236,6 @@ parseTektronixFormat f = TektronixFormat { staticFileInfo = (parseStaticFileInfo
                                          }
 
 
-newtype CheckSum       = CheckSum B.ByteString deriving (Show)
 
 readTektronixFile' :: String -> IO TektronixFormatB
 readTektronixFile' path = do
