@@ -1,10 +1,10 @@
 name:                waveform-ana
-version:             1.0.0.0
+version:             1.0.1.0
 github:              "shotaizu/waveform-ana"
 license:             GPL-3
 author:              "Shota Izumiyama"
 maintainer:          "izumiyama@hep.phys.titech.ac.jp"
-copyright:           ""
+copyright:           "Copyright (C) 2021  Shota Izumiyama"
 
 extra-source-files:
 - README.md
@@ -21,7 +21,6 @@ description:         Please see the README on GitHub at <https://github.com/shot
 
 dependencies:
 - base >= 4.7 && < 5
-- csv
 - statistics
 - vector
 - directory >= 1.3

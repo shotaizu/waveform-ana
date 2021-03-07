@@ -40,7 +40,7 @@ basicUsage prgname =
   ++ "Usage for tie-mode: \n"
   ++ "\t$ " ++ prgname ++ " --tie {threshold} {data}\n" -- [threshold2] [data2]\n"
   ++ "Usage for diff-mode: \n"
-  ++ "\t$ " ++ prgname ++ " -d {threshold} {data} {threshold2}  {data2}\n"
+  ++ "\t$ " ++ prgname ++ " -d {threshold} {data} {threshold2} {data2}\n"
 
 options :: [ OptDescr (Options -> IO Options) ]
 options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True})) "Enable verbose message"
@@ -61,6 +61,7 @@ options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True
             (NoArg
               (\_ -> do
                 prg <- getProgName
+                hPutStrLn stderr (basicUsage prg)
                 hPutStrLn stderr (usageInfo prg options)
                 exitSuccess))
             "Show help"

@@ -346,10 +346,22 @@ findCrossPointLinear thr (x0,y0) (x1,y1)
   | y1 == y0 && y1 == thr = [((x1 + x0) / 2.0,thr)]
   | otherwise = [ (x0 + (thr - y0) * (x1 - x0) / (y1 - y0), thr)]
 
+findCrossPointLinearFixedXScale :: Time -> Voltage -> DataPoint -> DataPoint -> [DataPoint]
+findCrossPointLinearFixedXScale xwidth thr (x0,y0) (x1,y1)
+  | y0 > y1 = []
+  | thr < y0 || thr > y1 = []
+  | y1 == y0 && y1 == thr = [((x1 + x0) / 2.0,thr)]
+  | otherwise = [ (x0 + (thr - y0) * xwidth / (y1 - y0), thr)]
+
 findCrossPoints :: Voltage -> CurveBuffer DataPoint -> [DataPoint]
 findCrossPoints thr (CurveBuffer (x:xx:xs)) = findCrossPointLinear thr x xx ++ findCrossPoints thr (CurveBuffer (xx:xs))
 findCrossPoints thr (CurveBuffer [x]) = []
 findCrossPoints thr (CurveBuffer []) = []
+
+findCrossPointsFixedXScale :: Time -> Voltage -> CurveBuffer DataPoint -> [DataPoint]
+findCrossPointsFixedXScale xwidth thr (CurveBuffer (x:xx:xs)) = findCrossPointLinearFixedXScale xwidth thr x xx ++ findCrossPointsFixedXScale xwidth thr (CurveBuffer (xx:xs))
+findCrossPointsFixedXScale _ _ (CurveBuffer [_]) = []
+findCrossPointsFixedXScale _ _ (CurveBuffer []) = []
 
 flatInTime = map fst
 
