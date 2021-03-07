@@ -343,7 +343,7 @@ findCrossPointLinear :: Voltage -> DataPoint -> DataPoint -> [DataPoint]
 findCrossPointLinear thr (x0,y0) (x1,y1)
   | y0 > y1 = []
   | thr < y0 || thr > y1 = []
-  | y1 == y0 && y1 == thr = [((x1 - x0) / 2.0,thr)]
+  | y1 == y0 && y1 == thr = [((x1 + x0) / 2.0,thr)]
   | otherwise = [ (x0 + (thr - y0) * (x1 - x0) / (y1 - y0), thr)]
 
 findCrossPoints :: Voltage -> CurveBuffer DataPoint -> [DataPoint]
