@@ -13,7 +13,7 @@ import System.IO
 
 import TektronixFormat
 
-data PrgMode = Trigger | Period | TIE | Diff
+data PrgMode = Trigger | Period | TIE | Diff | Waveform
   deriving (Show, Eq)
 data TIEMode = TIELocal | TIEGlobal
   deriving (Show, Eq)
@@ -48,6 +48,7 @@ options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True
           , Option "p" ["period"] (NoArg (\opt -> return opt {optMode = Period})) "Analysis mode: Period -> just measure 1 channel and calculate its period"
           , Option "" ["tie"] (NoArg (\opt -> return opt {optMode = TIE})) "Analysis mode: TIE -> calculate difference from ideal clcok edge"
           , Option "d" ["diff"] (NoArg (\opt -> return opt {optMode = Diff})) "Analysis mode: Difference -> calculate difference of edge time between two clock input"
+          , Option "w" ["waveform"] (NoArg (\opt -> return opt {optMode = Waveform})) "Analysis mode: Waveform -> dump waveform"
           , Option "" ["tstart"]
             (ReqArg 
               (\arg opt -> return opt { optStartEpochTime = read arg, optTIEGL = TIEGlobal }) "TIME")
@@ -128,17 +129,28 @@ main = do
         when (epsilon < delta) $ hPutStrLn stderr $ "Warning: neumerical digits-loss in grobal clock edge calculation: " ++ show delta
         mapM_ printDP $ zipWith (\x y -> (x, x-y)) (map (+ diffEpochTime) measEdge)  idealEdge
         exitSuccess
-          where printDP (x,y) = putStrLn $ show x ++ " " ++ show y
     Diff -> do
       if length files < 2
         then do
           hPutStrLn stderr (usageInfo (basicUsage progname) options)
           exitFailure
         else do
-          mapM_ print $ zipWith (-) (xpoints !! 0) (xpoints !! 1)
+          mapM_ printDP $ zip (xpoints !! 0) $ zipWith (-) (xpoints !! 0) (xpoints !! 1)
           exitSuccess
+    Waveform -> do
+      if length files < 1
+        then do
+          hPutStrLn stderr (usageInfo (basicUsage progname) options)
+          exitFailure
+        else do
+          let CurveBuffer cb = (takeTimeVoltageCurve . head) tekFiles
+          mapM_ printDP cb
+          exitSuccess
+         
 
   
+printDP (x,y) = putStrLn $ show x ++ " " ++ show y
+
 takeDiff :: (Num a) => [a] -> [a]
 takeDiff (x:y:xs) = y-x : takeDiff (y:xs)
 takeDiff [x] = []
