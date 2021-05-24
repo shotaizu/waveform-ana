@@ -22,6 +22,8 @@ data Options = Options { optVerbose :: Bool
                        , optStartEpochTime :: Int
                        , optIdealPeriod :: Double
                        , optTIEGL :: TIEMode
+                       , optDiffMin :: Double
+                       , optDiffMax :: Double
                        } deriving (Show)
 
 startOptions = Options { optVerbose = False
@@ -29,6 +31,8 @@ startOptions = Options { optVerbose = False
                        , optStartEpochTime = 1614135600 -- 2021-02-24 12:00:00
                        , optIdealPeriod = 0
                        , optTIEGL = TIELocal
+                       , optDiffMin = 100.0
+                       , optDiffMax = -100.0
                        }
 
 basicUsage prgname = 
@@ -41,6 +45,7 @@ basicUsage prgname =
   ++ "\t$ " ++ prgname ++ " --tie {threshold} {data}\n" -- [threshold2] [data2]\n"
   ++ "Usage for diff-mode: \n"
   ++ "\t$ " ++ prgname ++ " -d {threshold} {data} {threshold2} {data2}\n"
+  ++ "\t\tIt outputs \"{clock edge time} {difference of clock edge}\" to stdout\n"
 
 options :: [ OptDescr (Options -> IO Options) ]
 options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True})) "Enable verbose message"
@@ -58,6 +63,8 @@ options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True
               (\arg opt -> return opt { optIdealPeriod = read arg}) "TIME")
             "For TIE analysis: ideal period in sec"
           , Option "" ["localtie"] (NoArg (\opt -> return opt {optTIEGL = TIELocal})) "TIE ideal edge origin : set Local"
+          , Option "" ["diff_min"] (ReqArg (\arg opt -> return opt {optDiffMin = read arg}) "TIME") "Difference mode: lower limit to find same clock edge in sec (default = -period/2.0)"
+          , Option "" ["diff_max"] (ReqArg (\arg opt -> return opt {optDiffMax = read arg}) "TIME") "Difference mode: higher limit to find same clock edge in sec (default = period/2.0)"
           , Option "h" ["help"]
             (NoArg
               (\_ -> do
@@ -80,13 +87,15 @@ main = do
               , optStartEpochTime = tstart
               , optIdealPeriod = idealPeriod
               , optTIEGL = tieMode
+              , optDiffMin = diffMin
+              , optDiffMax = diffMax
               } = opts
       files = parseFileArgs nonoptArg :: [(Double, String)]
   when verbose $ hPrint stderr opts
-  when verbose $ hPutStrLn stderr $ (concat . map (\(x, y) -> "threshold: " ++ show x ++ ", file: " ++ show y ++ "/ ") . take 2) files
+  when verbose $ hPutStrLn stderr $ (concatMap (\(x, y) -> "threshold: " ++ show x ++ ", file: " ++ show y ++ "/ ") . take 2) files
 
   flagFiles <- mapM doesFileExist ((snd . unzip) (take 2 files))
-  when ((and flagFiles) == False) $ do
+  when (not (and flagFiles)) $ do
     hPutStrLn stderr $ "Could not read files: " ++ show flagFiles
     exitFailure
   tekFiles <- mapM readTektronixFile ((snd . unzip ) files)
@@ -103,7 +112,7 @@ main = do
         print $ compCenterEdge (xpoints !! 0) (xpoints !! 1)
         exitSuccess
     Period -> do
-      if length files < 1
+      if null files
       then do
         hPutStrLn stderr (usageInfo (basicUsage progname) options)
         exitFailure
@@ -111,7 +120,7 @@ main = do
         mapM_ print $ (takeDiff . head) xpoints
         exitSuccess
     TIE -> do
-      if length files < 1
+      if null files
       then do
         hPutStrLn stderr (usageInfo (basicUsage progname) options)
         exitFailure
@@ -135,11 +144,14 @@ main = do
           hPutStrLn stderr (usageInfo (basicUsage progname) options)
           exitFailure
         else do
-          let period = (S.mean . V.fromList . takeDiff) (xpoints !! 0)
-          mapM_ printDP $ map (\(x,y)-> (x, x-y)) $ catMatchedPoints (- period / 2.0 ) (period / 2.0) (xpoints !! 0) (xpoints !! 1)
+          let
+            period = (S.mean . V.fromList . takeDiff) (xpoints !! 0)
+            searchMin = if diffMin > diffMax then (- period / 2.0) else diffMin
+            searchMax = if diffMin > diffMax then    period / 2.0  else diffMax
+          mapM_ (printDP . (\(x,y)-> (x, x-y))) $ catMatchedPoints searchMin searchMax (xpoints !! 0) (xpoints !! 1)
           exitSuccess
     Waveform -> do
-      if length files < 1
+      if null files
         then do
           hPutStrLn stderr (usageInfo (basicUsage progname) options)
           exitFailure
@@ -172,7 +184,7 @@ findXPoints (thr, f) = flatInTime $ findCrossPoints thr (takeTimeVoltageCurve f)
 
 catMatchedPoints :: (Num a, Ord a) => a -> a -> [a] -> [a] -> [(a,a)]
 catMatchedPoints ymin ymax (x:xs) (y:ys)
-  | (y < x + ymax) && (y > x + ymin) = [(x,y)] ++ catMatchedPoints ymin ymax xs ys
+  | (y < x + ymax) && (y > x + ymin) = (x,y): catMatchedPoints ymin ymax xs ys
   | otherwise = catmatchedPoints ymin ymax xs ys
 catmatchedPoints _ _ [] [] = []
 
