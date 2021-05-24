@@ -135,7 +135,8 @@ main = do
           hPutStrLn stderr (usageInfo (basicUsage progname) options)
           exitFailure
         else do
-          mapM_ printDP $ zip (xpoints !! 0) $ zipWith (-) (xpoints !! 0) (xpoints !! 1)
+          let period = (S.mean . V.fromList . takeDiff) (xpoints !! 0)
+          mapM_ printDP $ map (\(x,y)-> (x, x-y)) $ catMatchedPoints (- period / 2.0 ) (period / 2.0) (xpoints !! 0) (xpoints !! 1)
           exitSuccess
     Waveform -> do
       if length files < 1
@@ -167,4 +168,11 @@ parseFileArgs [x] = []
 parseFileArgs [] = []
 
 findXPoints (thr, f) = flatInTime $ findCrossPoints thr (takeTimeVoltageCurve f)
+
+
+catMatchedPoints :: (Num a, Ord a) => a -> a -> [a] -> [a] -> [(a,a)]
+catMatchedPoints ymin ymax (x:xs) (y:ys)
+  | (y < x + ymax) && (y > x + ymin) = [(x,y)] ++ catMatchedPoints ymin ymax xs ys
+  | otherwise = catmatchedPoints ymin ymax xs ys
+catmatchedPoints _ _ [] [] = []
 
