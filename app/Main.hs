@@ -183,8 +183,18 @@ findXPoints (thr, f) = flatInTime $ findCrossPoints thr (takeTimeVoltageCurve f)
 
 
 catMatchedPoints :: (Num a, Ord a) => a -> a -> [a] -> [a] -> [(a,a)]
-catMatchedPoints ymin ymax (x:xs) (y:ys)
-  | (y < x + ymax) && (y > x + ymin) = (x,y): catMatchedPoints ymin ymax xs ys
-  | otherwise = catmatchedPoints ymin ymax xs ys
-catmatchedPoints _ _ [] [] = []
+catMatchedPoints ymin ymax (x:xs) ys
+  | null matched = catMatchedPoints ymin ymax xs ys
+  | otherwise = (x,head matched) : catMatchedPoints ymin ymax xs (tail matched)
+  where matched = findFirstMatchedPoint ymin ymax x ys
+catMatchedPoints _ _ _ [] = []
+catMatchedPoints _ _ [] _ = []
+
+findFirstMatchedPoint :: (Num a, Ord a) => a -> a -> a -> [a] -> [a]
+findFirstMatchedPoint xmin xmax x (y:ys)
+  | (y < x + xmax) && (y > x + xmin) = y:ys
+  | otherwise = findFirstMatchedPoint xmin xmax x ys
+findFirstMatchedPoint _ _ x [] = []
+
+
 
