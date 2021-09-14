@@ -187,6 +187,10 @@ catMatchedPoints ymin ymax (x:xs) ys
   | null matched = catMatchedPoints ymin ymax xs ys
   | otherwise = (x,head matched) : catMatchedPoints ymin ymax xs (tail matched)
   where matched = findFirstMatchedPoint ymin ymax x ys
+catMatchedPoints ymin ymax [x] ys
+  | null matched = []
+  | otherwise = [(x,head matched)]
+  where matched = findFirstMatchedPoint ymin ymax x ys
 catMatchedPoints _ _ _ [] = []
 catMatchedPoints _ _ [] _ = []
 
