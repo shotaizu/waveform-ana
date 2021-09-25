@@ -12,6 +12,7 @@ import System.Exit
 import System.IO
 
 import TektronixFormat
+import DataProcess
 
 data PrgMode = Trigger | Period | TIE | Diff | Waveform
   deriving (Show, Eq)
@@ -24,6 +25,7 @@ data Options = Options { optVerbose :: Bool
                        , optTIEGL :: TIEMode
                        , optDiffMin :: Double
                        , optDiffMax :: Double
+                       , optSmoothing :: Int
                        } deriving (Show)
 
 startOptions = Options { optVerbose = False
@@ -33,6 +35,7 @@ startOptions = Options { optVerbose = False
                        , optTIEGL = TIELocal
                        , optDiffMin = 100.0
                        , optDiffMax = -100.0
+                       , optSmoothing = 0
                        }
 
 basicUsage prgname = 
@@ -65,6 +68,7 @@ options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True
           , Option "" ["localtie"] (NoArg (\opt -> return opt {optTIEGL = TIELocal})) "TIE ideal edge origin : set Local"
           , Option "" ["diff_min"] (ReqArg (\arg opt -> return opt {optDiffMin = read arg}) "TIME") "Difference mode: lower limit to find same clock edge in sec (default = -period/2.0)"
           , Option "" ["diff_max"] (ReqArg (\arg opt -> return opt {optDiffMax = read arg}) "TIME") "Difference mode: higher limit to find same clock edge in sec (default = period/2.0)"
+          , Option "" ["smoothing"] (ReqArg (\arg opt -> return opt {optSmoothing = read arg}) "Int") "Waveform smoothing: number of averaging points (default = 0 (no smoothing))"
           , Option "h" ["help"]
             (NoArg
               (\_ -> do
@@ -89,6 +93,7 @@ main = do
               , optTIEGL = tieMode
               , optDiffMin = diffMin
               , optDiffMax = diffMax
+              , optSmoothing = smoothingN
               } = opts
       files = parseFileArgs nonoptArg :: [(Double, String)]
   when verbose $ hPrint stderr opts
@@ -101,7 +106,7 @@ main = do
   tekFiles <- mapM readTektronixFile ((snd . unzip ) files)
   let
     thrWithTekFiles = zipWith (\x y -> (fst x, y)) files tekFiles
-    xpoints = map findXPoints thrWithTekFiles
+    xpoints = map (findXPointsWithAveraging smoothingN) thrWithTekFiles
   case mode of 
     Trigger -> do
       if length files < 2
@@ -180,6 +185,9 @@ parseFileArgs [x] = []
 parseFileArgs [] = []
 
 findXPoints (thr, f) = flatInTime $ findCrossPoints thr (takeTimeVoltageCurve f)
+findXPointsWithAveraging n (thr, f) = 
+  if n == 0 then flatInTime $ findCrossPoints thr (takeTimeVoltageCurve f)
+            else flatInTime $ findCrossPoints thr (smoothingDataPoint n $ takeTimeVoltageCurve f)
 
 
 catMatchedPoints :: (Num a, Ord a) => a -> a -> [a] -> [a] -> [(a,a)]

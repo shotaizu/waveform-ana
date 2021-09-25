@@ -1,5 +1,15 @@
+------------------------
+-- Module: TektronixFormat
+-- for analysis of Tektronix WaveForM file (.wfm)
+-- Author: S. Izumiyama
+--
+-- Description:
+--   This codes are based on the document,
+--   "Reference Waveform File Format" (001-13780-03), Tektronix, Inc.
+-----------------------
 module TektronixFormat
   where
+
 
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Conversion
@@ -85,6 +95,8 @@ data TimeBaseInfo = TimeBaseInfo { realPointSpacing :: Natural
                                  , typeOfBase :: Maybe TypeOfBase
                                  } deriving (Show)
 newtype FastFrame      = FastFrame B.ByteString deriving (Show)
+
+-- Followings are original data types
 newtype CurveBuffer a  = CurveBuffer [a] deriving (Show)
 type Voltage = Double
 type Time = Double
@@ -97,6 +109,10 @@ instance Applicative CurveBuffer where
   (CurveBuffer fs) <*> (CurveBuffer xs) = CurveBuffer (fs <*> xs)
 newtype CheckSum       = CheckSum B.ByteString deriving (Show)
 
+----------------------
+-- Followings are parser
+-- constructed so that it parese from large fields to small fields
+----------------------
 parseStaticFileInfo :: StaticFileInfoB -> StaticFileInfo
 parseStaticFileInfo (StaticFileInfoB s) = StaticFileInfo {  byteOrderVerification = fromIntegral $ BinG.runGet BinG.getWord16le (cropByteString 0 2 s)
                                                          , versionNumver = cropByteString 2 8 s
@@ -237,6 +253,8 @@ parseTektronixFormat f = TektronixFormat { staticFileInfo = (parseStaticFileInfo
 
 
 
+----------------------------
+-- File handling
 readTektronixFile' :: String -> IO TektronixFormatB
 readTektronixFile' path = do
   content <- B.readFile path
@@ -313,15 +331,15 @@ zipTimeCurveBuf tb (CurveBuffer cb) = CurveBuffer (zip tb cb)
 
 takeTimeVoltageCurve :: TektronixFormat -> CurveBuffer DataPoint
 takeTimeVoltageCurve f = zipTimeCurveBuf (buildTimeBuffer tscale toffset preCS dS) (convVoltage vscale voffset (curveBuffer f))
-  where h = header f
-        eDH = expDim1 h
-        iDH = impDim1 h
-        tscale = impDimScale iDH
+  where h       = header f
+        eDH     = expDim1 h
+        iDH     = impDim1 h
+        tscale  = impDimScale iDH
         toffset = impDimOffset iDH
-        vscale = expDimScale eDH
+        vscale  = expDimScale eDH
         voffset = expDimOffset eDH
-        preCS = prechareStartOffset h
-        dS = dataStartOffset h
+        preCS   = prechareStartOffset h
+        dS      = dataStartOffset h
         
 
 
@@ -366,7 +384,7 @@ findCrossPointsFixedXScale _ _ (CurveBuffer []) = []
 flatInTime = map fst
 
 findCenterEdge :: (Ord a, Real a) => [a] -> a
-findCenterEdge = minimum . filter (0 <=) 
+findCenterEdge = minimum -- . filter (0 <=) 
 compCenterEdge :: [Double] -> [Double] -> Double
 compCenterEdge d1 d2 = fst $ foldl (\(x,y) (xx,yy) -> if y < yy then (x,y) else (xx,yy)) (9999.9, 9999.9) [(x, ax) | x <- map (\q -> q - findCenterEdge d1) d2, let ax = abs x]
 
