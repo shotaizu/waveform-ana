@@ -49,6 +49,9 @@ basicUsage prgname =
   ++ "Usage for diff-mode: \n"
   ++ "\t$ " ++ prgname ++ " -d {threshold} {data} {threshold2} {data2}\n"
   ++ "\t\tIt outputs \"{clock edge time} {difference of clock edge}\" to stdout\n"
+  ++ "Usage for waveform-mode: \n"
+  ++ "\t$ " ++ prgname ++ " -w {any_value} {data}\n"
+  ++ "\t\tIt dumps waveform as csv format to stdout\n"
 
 options :: [ OptDescr (Options -> IO Options) ]
 options = [ Option "v" ["verbose"] (NoArg (\opt -> return opt {optVerbose = True})) "Enable verbose message"
@@ -134,7 +137,7 @@ main = do
           (thr, f) = head thrWithTekFiles
           sec = (gmtSec . header) f - tstart
           diffEpochTime = if tieMode == TIEGlobal then fromIntegral sec  + (fracSec . header) f else 0
-          measEdge  = (flatInTime . findCrossPoints thr . takeTimeVoltageCurve) f
+          measEdge  = findXPointsWithAveraging smoothingN (thr, f)
           usedPeriod = if idealPeriod == 0 then (S.mean . V.fromList . takeDiff) measEdge else idealPeriod
           idealEdge = generateTrueCLKEdge' (diffEpochTime + (impDimOffset . impDim1 . header) f) 0 usedPeriod
           delta = ((head . takeDiff . take 2 ) idealEdge - usedPeriod) / usedPeriod
@@ -161,7 +164,7 @@ main = do
           hPutStrLn stderr (usageInfo (basicUsage progname) options)
           exitFailure
         else do
-          let CurveBuffer cb = (takeTimeVoltageCurve . head) tekFiles
+          let CurveBuffer cb = (smoothingDataPoint smoothingN . takeTimeVoltageCurve . head) tekFiles
           mapM_ printDP cb
           exitSuccess
          
