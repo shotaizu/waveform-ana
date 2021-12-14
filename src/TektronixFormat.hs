@@ -384,7 +384,7 @@ findCrossPointsFixedXScale _ _ (CurveBuffer []) = []
 flatInTime = map fst
 
 findCenterEdge :: (Ord a, Real a) => [a] -> a
-findCenterEdge = minimum -- . filter (0 <=) 
+findCenterEdge = foldl (\x y -> if abs x < abs y then x else y) 999999 --minimum -- . filter (0 <=) 
 compCenterEdge :: [Double] -> [Double] -> Double
 compCenterEdge d1 d2 = fst $ foldl (\(x,y) (xx,yy) -> if y < yy then (x,y) else (xx,yy)) (9999.9, 9999.9) [(x, ax) | x <- map (\q -> q - findCenterEdge d1) d2, let ax = abs x]
 
